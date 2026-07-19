@@ -1,4 +1,4 @@
-// Target-price alerts: local notifications (foreground) + a background task that
+// Momentum alerts: local notifications (foreground) + a background task that
 // re-checks prices even when the app is closed (standalone/dev builds only —
 // background execution does not run in Expo Go).
 import { Platform } from "react-native";
@@ -8,11 +8,13 @@ import * as BackgroundTask from "expo-background-task";
 
 import { signInShared, getMarketsOnce, saveMarket } from "./markets";
 import { fetchQuote } from "./quotes";
-import { aboveTarget, priceLabel, MOMENTUM_DAY_PCT, MOMENTUM_3D_PCT } from "./format";
+import { MOMENTUM_DAY_PCT, MOMENTUM_3D_PCT } from "./format";
 
 const ACCENT = "#d8a34a";
+// Android channel id kept as "targets" for continuity with existing installs;
+// its display name reflects the current (momentum-only) purpose.
 const CHANNEL = "targets";
-const TARGET_TASK = "playmarkets-target-check";
+const CHECK_TASK = "playmarkets-target-check";
 
 // Show notifications even when the app is in the foreground.
 Notifications.setNotificationHandler({
@@ -34,7 +36,7 @@ export async function setupNotifications() {
     }
     if (Platform.OS === "android") {
       await Notifications.setNotificationChannelAsync(CHANNEL, {
-        name: "Target alerts",
+        name: "Momentum alerts",
         importance: Notifications.AndroidImportance.HIGH,
         lightColor: ACCENT,
       });
@@ -48,25 +50,6 @@ export async function setupNotifications() {
 
 export function notificationsReady() {
   return ready;
-}
-
-// Fires one PlayMarkets-branded notification summarising markets above target.
-export async function sendTargetNotification(hits) {
-  if (!ready || !hits || !hits.length) return;
-  const title = hits.length === 1
-    ? `${hits[0].name} is above target`
-    : `${hits.length} markets above target`;
-  const body = hits
-    .map((m) => `${m.name}: ${priceLabel(m.price)} (target ${m.target})`)
-    .join("\n");
-  try {
-    await Notifications.scheduleNotificationAsync({
-      content: { title, body, color: ACCENT, sound: true },
-      trigger: Platform.OS === "android" ? { channelId: CHANNEL, seconds: 1 } : null,
-    });
-  } catch (e) {
-    console.log("notify failed", e?.message || e);
-  }
 }
 
 // ---- Momentum alerts (fast risers) ----
@@ -130,44 +113,38 @@ export async function sendMomentumNotification(hits) {
   }
 }
 
-// Refreshes prices and notifies about anything above target or rising fast.
-// Used by the background task (app closed) and reusable on a foreground interval.
-export async function runTargetCheck() {
+// Refreshes prices and notifies about anything rising fast. Used by the
+// background task (app closed) and reusable on a foreground interval.
+export async function runMomentumCheck() {
   await signInShared();
   const list = await getMarketsOnce();
-  const hits = [];
   const momHits = [];
   for (const m of list) {
-    let cur = m;
     const sym = (m.quote || m.symbol || "").trim();
-    if (sym) {
-      try {
-        const q = await fetchQuote(sym);
-        cur = {
-          ...m,
-          price: String(q.price),
-          changeDay: q.changeDay != null ? String(q.changeDay) : "",
-          changeWeek: q.changeWeek != null ? String(q.changeWeek) : "",
-          changeMonth: q.changeMonth != null ? String(q.changeMonth) : "",
-          change3d: q.change3d != null ? String(q.change3d) : "",
-        };
-        await saveMarket(cur);
-        const reason = takeMomentumReason(m.id, q);
-        if (reason) momHits.push({ name: m.name, reason });
-      } catch (e) { /* keep last-known price */ }
-    }
-    if (aboveTarget(cur)) hits.push(cur);
+    if (!sym) continue;
+    try {
+      const q = await fetchQuote(sym);
+      await saveMarket({
+        ...m,
+        price: String(q.price),
+        changeDay: q.changeDay != null ? String(q.changeDay) : "",
+        changeWeek: q.changeWeek != null ? String(q.changeWeek) : "",
+        changeMonth: q.changeMonth != null ? String(q.changeMonth) : "",
+        change3d: q.change3d != null ? String(q.change3d) : "",
+      });
+      const reason = takeMomentumReason(m.id, q);
+      if (reason) momHits.push({ name: m.name, reason });
+    } catch (e) { /* keep last-known price */ }
   }
-  await sendTargetNotification(hits);
   await sendMomentumNotification(momHits);
 }
 
 // ---- Background task (runs when the app is closed; not in Expo Go) ----
-TaskManager.defineTask(TARGET_TASK, async () => {
+TaskManager.defineTask(CHECK_TASK, async () => {
   try {
     // Notifications may need setup in the headless context.
     if (!ready) await setupNotifications();
-    await runTargetCheck();
+    await runMomentumCheck();
     return BackgroundTask.BackgroundTaskResult.Success;
   } catch (e) {
     console.log("bg task failed", e?.message || e);
@@ -179,9 +156,9 @@ export async function registerBackgroundAlerts() {
   try {
     const status = await BackgroundTask.getStatusAsync();
     if (status === BackgroundTask.BackgroundTaskStatus.Restricted) return;
-    const already = await TaskManager.isTaskRegisteredAsync(TARGET_TASK);
+    const already = await TaskManager.isTaskRegisteredAsync(CHECK_TASK);
     if (!already) {
-      await BackgroundTask.registerTaskAsync(TARGET_TASK, { minimumInterval: 240 }); // ~4h (minutes)
+      await BackgroundTask.registerTaskAsync(CHECK_TASK, { minimumInterval: 240 }); // ~4h (minutes)
     }
   } catch (e) {
     // Not available (e.g. Expo Go) — foreground alerts still work.

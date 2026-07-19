@@ -4,7 +4,7 @@ import {
 } from "react-native";
 import { colors } from "../theme";
 import { useMarkets } from "../MarketsContext";
-import { changeInfo, priceLabel, aboveTarget } from "../format";
+import { changeInfo, priceLabel } from "../format";
 
 export default function EditorScreen({ navigation, route }) {
   const { id } = route.params;
@@ -85,11 +85,6 @@ export default function EditorScreen({ navigation, route }) {
               </Text>
             );
           })}
-          {m.target ? (
-            <Text style={{ color: aboveTarget(m) ? colors.up : colors.textMuted, fontSize: 12 }}>
-              {aboveTarget(m) ? "● " : "⌖ "}target {m.target}
-            </Text>
-          ) : null}
         </View>
       </View>
 

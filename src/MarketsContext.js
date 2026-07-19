@@ -1,8 +1,7 @@
 import React, { createContext, useContext, useRef, useState } from "react";
 import { signInShared, subscribeMarkets, saveMarket, createMarket, deleteMarket } from "./markets";
 import { fetchQuote } from "./quotes";
-import { aboveTarget } from "./format";
-import { setupNotifications, registerBackgroundAlerts, sendTargetNotification,
+import { setupNotifications, registerBackgroundAlerts,
   takeMomentumReason, sendMomentumNotification } from "./alerts";
 
 const MarketsContext = createContext(null);
@@ -14,16 +13,10 @@ export function MarketsProvider({ children }) {
   const [lastRefresh, setLastRefresh] = useState(null);
   const marketsRef = useRef([]);
   const startedRef = useRef(false);
-  const prevAbove = useRef(new Set());
 
   const setAll = (list) => {
     marketsRef.current = list;
     setMarkets(list);
-    // Instant alert when a market newly rises above its target.
-    const nowAbove = new Set(list.filter(aboveTarget).map((m) => m.id));
-    const newly = list.filter((m) => nowAbove.has(m.id) && !prevAbove.current.has(m.id));
-    prevAbove.current = nowAbove;
-    if (newly.length) sendTargetNotification(newly);
   };
 
   // Called after a successful login: sign in, set up alerts, then subscribe.
@@ -34,12 +27,8 @@ export function MarketsProvider({ children }) {
       await setupNotifications();      // request permission before first snapshot
       registerBackgroundAlerts();      // background checks (standalone builds)
       subscribeMarkets(setAll);
-      // Reminder about anything above target, every 4 hours while open.
-      setInterval(() => {
-        refreshQuotes().then(() =>
-          sendTargetNotification(marketsRef.current.filter(aboveTarget))
-        );
-      }, 4 * 60 * 60 * 1000);
+      // Re-check prices every 4 hours while open; momentum alerts fire inside.
+      setInterval(refreshQuotes, 4 * 60 * 60 * 1000);
     }
   }
 

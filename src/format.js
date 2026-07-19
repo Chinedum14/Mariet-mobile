@@ -18,12 +18,6 @@ export function priceLabel(raw) {
   return p ? "$" + p : "";
 }
 
-export function aboveTarget(m) {
-  const price = parseFloat(m.price);
-  const target = parseFloat(m.target);
-  return !isNaN(price) && !isNaN(target) && m.target !== "" && price > target;
-}
-
 // Momentum thresholds: a rise of this much in one trading day, or over the last
 // 3 trading days, counts as "rising fast".
 export const MOMENTUM_DAY_PCT = 3;

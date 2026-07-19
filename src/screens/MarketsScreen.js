@@ -4,7 +4,7 @@ import {
 } from "react-native";
 import { colors } from "../theme";
 import { useMarkets } from "../MarketsContext";
-import { changeInfo, aboveTarget, hasMomentum } from "../format";
+import { changeInfo, hasMomentum } from "../format";
 
 function groupByCategory(markets) {
   const groups = {};
@@ -77,12 +77,11 @@ export default function MarketsScreen({ navigation }) {
               <Text style={styles.rowName}>{m.name}</Text>
               <View style={styles.ticker}>
                 {m.symbol ? <Text style={styles.tickerSym}>{m.symbol}</Text> : null}
-                {hasMomentum(m) ? <View style={styles.momentumDot} /> : null}
                 <Text style={{ color: ci.color, fontSize: 11 }}>{ci.arrow}</Text>
                 {ci.pct ? <Text style={{ color: ci.color, fontSize: 11 }}>{ci.pct}</Text> : null}
               </View>
             </View>
-            {aboveTarget(m) ? <View style={styles.marker} /> : null}
+            {hasMomentum(m) ? <View style={styles.marker} /> : null}
           </Pressable>
         );
       }}

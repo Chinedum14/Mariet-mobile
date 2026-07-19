@@ -34,7 +34,6 @@ export default function EditMarketScreen({ navigation, route }) {
   const [symbol, setSymbol] = useState(existing?.symbol || "");
   const [quote, setQuote] = useState(existing?.quote || "");
   const [category, setCategory] = useState(existing?.category || "");
-  const [target, setTarget] = useState(existing?.target || "");
   const [busy, setBusy] = useState(false);
 
   const onSave = async () => {
@@ -43,7 +42,7 @@ export default function EditMarketScreen({ navigation, route }) {
     try {
       const fields = {
         name: name.trim(), symbol: symbol.trim(), quote: quote.trim(),
-        category: category.trim(), target: target.trim().replace(/^\$/, ""),
+        category: category.trim(),
       };
       if (editingId && existing) {
         await saveMarket({ ...existing, ...fields });
@@ -68,7 +67,7 @@ export default function EditMarketScreen({ navigation, route }) {
         </Pressable>
       ),
     });
-  }, [navigation, name, symbol, quote, category, target, busy]);
+  }, [navigation, name, symbol, quote, category, busy]);
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -79,10 +78,6 @@ export default function EditMarketScreen({ navigation, route }) {
         value={quote} onChangeText={setQuote} placeholder="e.g. CL=F"
       />
       <Field label="Category" value={category} onChangeText={setCategory} placeholder="e.g. Energy" />
-      <Field
-        label="Target price" hint="optional; alerts when price rises above it"
-        value={target} onChangeText={setTarget} placeholder="e.g. 4000" keyboardType="decimal-pad"
-      />
       <Text style={styles.note}>
         Price and day/week/month change are fetched live from Yahoo Finance.
       </Text>
