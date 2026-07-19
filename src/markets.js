@@ -9,25 +9,36 @@ import { syncAccount } from "../firebase-config";
 
 const COL = "markets";
 
+const NET_RETRIES = 4;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const isNetErr = (e) => (e?.code || "") === "auth/network-request-failed";
+
 // Signs into the shared Firebase account so every device sees the same data.
 // The account is created automatically the first time any device signs in.
+// Retries on auth/network-request-failed — the first attempt on a cold start
+// (or a slow/flaky mobile connection) often flakes out.
 export async function signInShared() {
   const { email, password } = syncAccount;
-  try {
-    await signInWithEmailAndPassword(auth, email, password);
-  } catch (e) {
-    const code = e?.code || "";
-    if (code === "auth/user-not-found" || code === "auth/invalid-credential") {
-      try {
-        await createUserWithEmailAndPassword(auth, email, password);
-      } catch (e2) {
-        if (e2?.code === "auth/email-already-in-use") {
-          await signInWithEmailAndPassword(auth, email, password); // wrong password
-        } else {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      return;
+    } catch (e) {
+      const code = e?.code || "";
+      if (code === "auth/user-not-found" || code === "auth/invalid-credential") {
+        try {
+          await createUserWithEmailAndPassword(auth, email, password);
+          return;
+        } catch (e2) {
+          if (e2?.code === "auth/email-already-in-use") {
+            await signInWithEmailAndPassword(auth, email, password); // wrong password
+            return;
+          }
+          if (isNetErr(e2) && attempt < NET_RETRIES) { await sleep(600 * 2 ** attempt); continue; }
           throw e2;
         }
       }
-    } else {
+      if (isNetErr(e) && attempt < NET_RETRIES) { await sleep(600 * 2 ** attempt); continue; }
       throw e;
     }
   }
