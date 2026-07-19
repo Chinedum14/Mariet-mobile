@@ -2,7 +2,8 @@ import React, { createContext, useContext, useRef, useState } from "react";
 import { signInShared, subscribeMarkets, saveMarket, createMarket, deleteMarket } from "./markets";
 import { fetchQuote } from "./quotes";
 import { aboveTarget } from "./format";
-import { setupNotifications, registerBackgroundAlerts, sendTargetNotification } from "./alerts";
+import { setupNotifications, registerBackgroundAlerts, sendTargetNotification,
+  takeMomentumReason, sendMomentumNotification } from "./alerts";
 
 const MarketsContext = createContext(null);
 export const useMarkets = () => useContext(MarketsContext);
@@ -45,6 +46,7 @@ export function MarketsProvider({ children }) {
   async function refreshQuotes() {
     if (refreshing) return;
     setRefreshing(true);
+    const momHits = [];
     try {
       for (const m of marketsRef.current) {
         const sym = (m.quote || m.symbol || "").trim();
@@ -57,10 +59,14 @@ export function MarketsProvider({ children }) {
             changeDay: q.changeDay != null ? String(q.changeDay) : "",
             changeWeek: q.changeWeek != null ? String(q.changeWeek) : "",
             changeMonth: q.changeMonth != null ? String(q.changeMonth) : "",
+            change3d: q.change3d != null ? String(q.change3d) : "",
           });
+          const reason = takeMomentumReason(m.id, q);
+          if (reason) momHits.push({ name: m.name, reason });
         } catch (e) { /* skip this symbol */ }
       }
       setLastRefresh(Date.now());
+      sendMomentumNotification(momHits);
     } finally {
       setRefreshing(false);
     }

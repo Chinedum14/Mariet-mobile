@@ -25,7 +25,15 @@ function closeDaysBack(points, lastTs, days) {
   return best != null ? best : points.length ? points[0][1] : null;
 }
 
-// Fetches one symbol; returns { price, changeDay, changeWeek, changeMonth } or throws.
+// Close `n` trading sessions before the latest session. `points` is ascending
+// and each entry is one trading day, so this counts trading days, not calendar
+// days. Falls back to the earliest close when history is short.
+function closeTradingDaysBack(points, n) {
+  if (!points.length) return null;
+  return points.length > n ? points[points.length - 1 - n][1] : points[0][1];
+}
+
+// Fetches one symbol; returns { price, changeDay, changeWeek, changeMonth, change3d } or throws.
 export async function fetchQuote(symbol) {
   const sym = String(symbol || "").trim();
   if (!sym) throw new Error("no symbol");
@@ -49,13 +57,14 @@ export async function fetchQuote(symbol) {
     }
   }
 
-  let changeDay = null, changeWeek = null, changeMonth = null;
+  let changeDay = null, changeWeek = null, changeMonth = null, change3d = null;
   if (points.length) {
     const lastTs = points[points.length - 1][0];
     changeDay = pctChange(price, closeDaysBack(points, lastTs, 1));
     changeWeek = pctChange(price, closeDaysBack(points, lastTs, 7));
     changeMonth = pctChange(price, closeDaysBack(points, lastTs, 30));
+    change3d = pctChange(price, closeTradingDaysBack(points, 3));
   }
 
-  return { price: round2(price), changeDay, changeWeek, changeMonth };
+  return { price: round2(price), changeDay, changeWeek, changeMonth, change3d };
 }

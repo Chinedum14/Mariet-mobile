@@ -8,7 +8,7 @@ import * as BackgroundTask from "expo-background-task";
 
 import { signInShared, getMarketsOnce, saveMarket } from "./markets";
 import { fetchQuote } from "./quotes";
-import { aboveTarget, priceLabel } from "./format";
+import { aboveTarget, priceLabel, MOMENTUM_DAY_PCT, MOMENTUM_3D_PCT } from "./format";
 
 const ACCENT = "#d8a34a";
 const CHANNEL = "targets";
@@ -69,12 +69,74 @@ export async function sendTargetNotification(hits) {
   }
 }
 
-// Refreshes prices and notifies about anything above target. Used by the
-// background task (app closed) and can be reused on a foreground interval.
+// ---- Momentum alerts (fast risers) ----
+// Per-day dedup so a market that stays above threshold isn't re-alerted all day.
+let momentumDay = "";
+const momentumSeen = new Set();
+
+function dayStamp() {
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+// Returns a reason for any momentum rule that NEWLY fired today for this market
+// (marking it so it won't re-alert), or null. When a rule no longer holds its
+// mark is cleared, so a genuine fresh spike later the same day alerts again.
+// `q` is a fresh quote with numeric changeDay / change3d.
+export function takeMomentumReason(id, q) {
+  const stamp = dayStamp();
+  if (stamp !== momentumDay) { momentumDay = stamp; momentumSeen.clear(); }
+
+  const day = Number(q?.changeDay);
+  const d3 = Number(q?.change3d);
+  const parts = [];
+
+  if (Number.isFinite(day) && day >= MOMENTUM_DAY_PCT) {
+    if (!momentumSeen.has(`${id}:day`)) {
+      momentumSeen.add(`${id}:day`);
+      parts.push(`up ${day}% today`);
+    }
+  } else {
+    momentumSeen.delete(`${id}:day`); // re-arm once it drops back below threshold
+  }
+
+  if (Number.isFinite(d3) && d3 >= MOMENTUM_3D_PCT) {
+    if (!momentumSeen.has(`${id}:3d`)) {
+      momentumSeen.add(`${id}:3d`);
+      parts.push(`up ${d3}% over 3 trading days`);
+    }
+  } else {
+    momentumSeen.delete(`${id}:3d`);
+  }
+
+  return parts.length ? parts.join(" · ") : null;
+}
+
+// Fires one PlayMarkets-branded notification summarising fast-rising markets.
+// `hits` is an array of { name, reason }.
+export async function sendMomentumNotification(hits) {
+  if (!ready || !hits || !hits.length) return;
+  const title = hits.length === 1
+    ? `${hits[0].name} is moving`
+    : `${hits.length} markets moving`;
+  const body = hits.map((h) => `${h.name}: ${h.reason}`).join("\n");
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: { title, body, color: ACCENT, sound: true },
+      trigger: Platform.OS === "android" ? { channelId: CHANNEL, seconds: 1 } : null,
+    });
+  } catch (e) {
+    console.log("momentum notify failed", e?.message || e);
+  }
+}
+
+// Refreshes prices and notifies about anything above target or rising fast.
+// Used by the background task (app closed) and reusable on a foreground interval.
 export async function runTargetCheck() {
   await signInShared();
   const list = await getMarketsOnce();
   const hits = [];
+  const momHits = [];
   for (const m of list) {
     let cur = m;
     const sym = (m.quote || m.symbol || "").trim();
@@ -87,13 +149,17 @@ export async function runTargetCheck() {
           changeDay: q.changeDay != null ? String(q.changeDay) : "",
           changeWeek: q.changeWeek != null ? String(q.changeWeek) : "",
           changeMonth: q.changeMonth != null ? String(q.changeMonth) : "",
+          change3d: q.change3d != null ? String(q.change3d) : "",
         };
         await saveMarket(cur);
+        const reason = takeMomentumReason(m.id, q);
+        if (reason) momHits.push({ name: m.name, reason });
       } catch (e) { /* keep last-known price */ }
     }
     if (aboveTarget(cur)) hits.push(cur);
   }
   await sendTargetNotification(hits);
+  await sendMomentumNotification(momHits);
 }
 
 // ---- Background task (runs when the app is closed; not in Expo Go) ----

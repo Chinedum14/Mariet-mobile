@@ -23,3 +23,16 @@ export function aboveTarget(m) {
   const target = parseFloat(m.target);
   return !isNaN(price) && !isNaN(target) && m.target !== "" && price > target;
 }
+
+// Momentum thresholds: a rise of this much in one trading day, or over the last
+// 3 trading days, counts as "rising fast".
+export const MOMENTUM_DAY_PCT = 3;
+export const MOMENTUM_3D_PCT = 6;
+
+// True when a market currently satisfies either momentum rule. Drives the green
+// dot; derived from live fields so it clears itself once prices update.
+export function hasMomentum(m) {
+  const day = parseFloat(m.changeDay);
+  const d3 = parseFloat(m.change3d);
+  return (!isNaN(day) && day >= MOMENTUM_DAY_PCT) || (!isNaN(d3) && d3 >= MOMENTUM_3D_PCT);
+}
