@@ -42,3 +42,4 @@ yarn-error.*
 
 # local secrets (shared account password)
 firebase-config.js
+config.bat

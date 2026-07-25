@@ -1,8 +1,19 @@
-# PlayMarkets — Mobile (Expo / React Native)
+# Mariet — Mobile (Expo / React Native)
 
-The mobile companion to the desktop **PlayMarkets** app. Same login, same
-markets, same live Yahoo prices and target alerts — with notes synced through
+The mobile companion to the desktop **Mariet** app. Same login, same
+markets, same live Yahoo prices and momentum alerts — with notes synced through
 **Firebase Firestore**, so the desktop and mobile apps share one dataset.
+
+## More than market research — it's a game
+
+Mariet isn't just a notebook for tracking prices. It's a strategy game of
+**anticipating how markets react to supply crises** — an OPEC cut, a drought, a
+blocked shipping lane, a chip shortage. You form a thesis about where a shock
+will push prices, write it in the market's notes, and let live data and momentum
+alerts tell you whether you called it. On mobile you carry that game in your
+pocket: your theses sync from the desktop, and a **push notification** buzzes the
+moment a market you're watching starts breaking out. (See the desktop README for
+the full "how to play.")
 
 ## Prerequisites
 
@@ -27,12 +38,13 @@ live-reloads as you edit.
 
 - **Login** (`Varol` / `ResearchAndPlay`) → signs into the shared Firebase
   account behind the scenes.
-- **Markets list** — grouped by category, live day-change per row, green dot
-  when price is above target. Pull down (or ↻) to refresh quotes.
+- **Markets list** — grouped by category, live day-change per row, green dot on
+  the fast risers (up ≥ 3% in a day or ≥ 6% over 3 trading days). Pull down (or
+  ↻) to refresh quotes.
 - **Editor** — notes autosave to Firestore; header shows price + 1D/1W/1M change
-  and the target indicator.
-- **Add/Edit** — name, symbol, Yahoo symbol, category, target. Price and changes
-  come from Yahoo, not entered by hand.
+  and the momentum indicator.
+- **Add/Edit** — name, symbol, Yahoo symbol, category. Price and changes come
+  from Yahoo, not entered by hand.
 
 ## Structure
 
